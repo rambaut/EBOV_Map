@@ -28,6 +28,7 @@
 <script src="http://d3js.org/d3.v3.min.js"></script>
 <script src="http://d3js.org/topojson.v1.min.js"></script>
 <script src="http://d3js.org/d3.geo.projection.v0.min.js"></script>
+<script src="http://d3js.org/queue.v1.min.js"></script>
 <script>
 
 var width = 960,
@@ -65,28 +66,45 @@ svg
     .call(zoom) // delete this line to disable free zooming
     .call(zoom.event);
 
+queue()
+        .defer(d3.json, "ebov.json")
+        .defer(d3.tsv, "legend.tsv")
+        .await(ready);
 
-d3.json("ebov.json", function(error, locations) {
-	var locationData = topojson.feature(locations, locations.objects.ebov).features;
+
+function ready(error, locationData, legendData) {
+    if (error) return console.log("there was an error loading the data: " + error);
+
+	var colors = {};
+	
+    legendData.forEach(function (legendData) {
+		colors[legendData.location] = legendData.color;
+	});
+	
+	var locations = topojson.feature(locationData, locationData.objects.ebov).features;
 
 	g.selectAll("path")
-		.data(locationData)
+		.data(locations)
 		.enter().append("path")
 		.style("fill", function(d) {
-			return (d.properties.ISO === "GIN" ? "lightseagreen" :
-					(d.properties.ISO === "SLE" ? "steelblue" :
-					(d.properties.ISO === "LBR" ? "lightcoral" : "lightseagreen")));
+			return colors[d.properties.NAME_2];
+
+//			if (d.properties.NAME_2 in colors) {
+				
+//			return (d.properties.ISO === "GIN" ? "lightseagreen" :
+//					(d.properties.ISO === "SLE" ? "steelblue" :
+//					(d.properties.ISO === "LBR" ? "lightcoral" : "lightseagreen")));
 			})
 		.attr("d", path)
 		.attr("class", "feature")
 		.on("click", clicked);
 
-  g.append("path")
-      .datum(topojson.mesh(locations, locations.objects.ebov, function(a, b) { return a !== b; }))
+  	g.append("path")
+      .datum(topojson.mesh(locationData, locationData.objects.ebov, function(a, b) { return a !== b; }))
       .attr("class", "mesh")
       .attr("d", path);
 
-});
+}
 
 function clicked(d) {
   if (active.node() === this) return reset();
